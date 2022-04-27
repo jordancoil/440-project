@@ -1,62 +1,143 @@
-import re
+import numpy as np
 import pandas as pd
+from word2vec.generate_vectors import get_word2vec_model
 
-def LoadVocabBins():
-    # load JLPT vocab and sort into levels 1-4
 
-    p = r'\n'
+# load JLPT vocab and sort into levels 1-4
+def load_vocab_levels():
+    file_names_and_bin_numbers = [
+        ('data/jlpt/jlpt-voc-4-extra.utf', '4'),
+        ('data/jlpt/jlpt-voc-3-extra.utf', '3'),
+        ('data/jlpt/jlpt-voc-2-extra.utf', '2'),
+        ('data/jlpt/jlpt-voc-1-extra.utf', '1')]
 
-    vocab_bins = {
-        '1': {},
-        '2': {},
-        '3': {},
-        '4': {}
-    }
-    files = [
-        ('/data/jlpt/jlpt-voc-1.utf', '1'), 
-        ('/data/jlpt/jlpt-voc-2.utf', '2'), 
-        ('/data/jlpt/jlpt-voc-3.utf', '3'), 
-        ('/data/jlpt/jlpt-voc-4.utf', '4')]
+    #               jlpt,   kanji,  kana
+    vocab_levels = [[], [], []]
+    kanji_list = set()
 
-    for file, bin in files:
-    with open(file) as f:
-        for l in f.readlines():
-            if not l.startswith("#") and not l.startswith("\n"):
-                l = re.sub(p,'',l)
-                w = l.split(" ")
-
-                if '~' in w[0]:
-                    # dont add these
+    for file_name, jlpt in file_names_and_bin_numbers:
+        with open(file_name, 'r', encoding='utf8') as f:
+            for line in f.readlines():
+                # skip if line is a comment or empty
+                if line.startswith("#") or line.startswith("\n"):
                     continue
 
-                if w[0] in vocab_bins[bin].keys():
-                    # print("Duplicate found in bin ", bin, " : ", w[0])
-                    pass
+                word_list = line[:-1].split(" ")
+
+                # skip words that have tilde or appear in lower difficulty bins
+                if '~' in word_list[0] or word_list[0] in kanji_list:
+                    continue
+
+                # add JLPT difficulty
+                vocab_levels[0].append(int(jlpt))
+
+                # add both kanji and kana if it has it
+                if len(word_list) > 1 and word_list[1].startswith('[') and '（' not in word_list[1]:
+                    vocab_levels[1].append(word_list[0])
+                    vocab_levels[2].append(word_list[1][1:-1])
+                    # add to list of used kanji
+                    kanji_list.add(word_list[0])
+                # add just kana as it has no kanji
                 else:
-                    # can't really remember what this does...
-                    if len(w) > 1 and not w[1].startswith('（'):
-                        vocab_bins[bin][w[0]] = w[1]
+                    vocab_levels[1].append('')
+                    vocab_levels[2].append(word_list[0])
+
+    return vocab_levels
+
+'''
+    for file_name, bin_number in file_names_and_bin_numbers:
+        with open(file_name, 'r', encoding='utf8') as f:
+            char_to_column_index = dict()
+
+            for line in f.readlines():
+                # skip if line is a comment or empty
+                if line.startswith("#") or line.startswith("\n"):
+                    continue
+
+                word_list = line[:-1].split(" ")
+
+                # skip words that have tilde or appear in lower difficulty bins
+                if '~' in word_list[0] or any(
+                        [word_list[0] in vocab_bins[str(k)][0] for k in range(int(bin_number) + 1, 5)]):
+                    continue
+
+                # add both kanji and kana if it has it
+                if len(word_list) > 1 and word_list[1].startswith('[') and '（' not in word_list[1]:
+                    vocab_bins[bin_number][0].append(word_list[0])
+                    vocab_bins[bin_number][1].append(word_list[1][1:-1])
+                # has no kanji
+                else:
+                    vocab_bins[bin_number][0].append('')
+                    vocab_bins[bin_number][1].append(word_list[0])
+
+                # set the count of each char to 0
+                for char in char_to_column_index.keys():
+                    vocab_bins[bin_number][char_to_column_index[char]].append(0)
+
+                # for each char in the kana, increase count by 1
+                for char in vocab_bins[bin_number][1][-1]:
+                    # char is already has a column
+                    if char in char_to_column_index:
+                        vocab_bins[bin_number][char_to_column_index[char]][-1] += 1
+                    # there is no char column, make one
                     else:
-                        vocab_bins[bin][w[0]] = 1
-
-    # remove duplicate keys from higher bins
-    for k4 in vocab_bins['4'].keys():
-        vocab_bins['3'].pop(k4, None)
-        vocab_bins['2'].pop(k4, None)
-        vocab_bins['1'].pop(k4, None)
-
-    for k3 in vocab_bins['3'].keys():
-        vocab_bins['2'].pop(k4, None)
-        vocab_bins['1'].pop(k4, None)
-
-    for k2 in vocab_bins['2'].keys():
-        vocab_bins['1'].pop(k2, None)
+                        char_to_column_index[char] = len(vocab_bins[bin_number])
+                        vocab_bins[bin_number].append([0] * len(vocab_bins[bin_number][0]))
+                        vocab_bins[bin_number][char_to_column_index[char]][-1] = 1
 
     return vocab_bins
+'''
 
 
-def LoadFreqList(file_name):
-    '''
+# todo
+def generate_word_similarity_model(kana):
+    char_to_column_index = dict()
+    kana_vectors = [kana]
+    for word in kana:
+        for index in char_to_column_index.values():
+            kana_vectors[index].append(0)
+
+        for char in word:
+            if char in char_to_column_index.keys():
+                kana_vectors[char_to_column_index[char]][-1] += 1
+            else:
+                1+1
+
+if __name__ == "__main__":
+    levels = load_vocab_levels()
+    print(levels)
+    model = get_word2vec_model()
+
+
+# load JLPT vocab and sort into levels 1-4
+def load_jlpt():
+    jlpt = dict()
+
+    file_names_and_bin_numbers = [
+        ('data/jlpt/jlpt-voc-1.utf', '1'),
+        ('data/jlpt/jlpt-voc-2.utf', '2'),
+        ('data/jlpt/jlpt-voc-3.utf', '3'),
+        ('data/jlpt/jlpt-voc-4.utf', '4')]
+
+    for file_name, bin_number in file_names_and_bin_numbers:
+        with open(file_name, 'r', encoding='utf8') as f:
+            for line in f.readlines():
+                if line.startswith("#") or line.startswith("\n"):
+                    continue
+
+                word_list = line[:-1].split(" ")
+
+                for word in word_list:
+                    # checks for invalid words or if the word is already in a lower difficulty bin
+                    if '~' in word or word.startswith('（'):
+                        continue
+                    jlpt[word] = bin_number
+
+    return jlpt
+
+
+def load_freq_list(file_name):
+    """
     eg. file_name = '/data/freq_lists/word_freq_report.txt'
     https://github.com/chriskempson/japanese-subtitles-word-frequency-list
 
@@ -70,107 +151,54 @@ def LoadFreqList(file_name):
 
     Alternatives:
     file_name = '/data/freq_lists/netflix_unidic_3011_no_names_word_freq_report.txt'
-    col_names = ['occurances', 'kanji', 'hiragana', 'kana', 'part_of_speech', 
+    col_names = ['occurrences', 'kanji', 'hiragana', 'kana', 'part_of_speech',
                  'anotherpos', 'freq_group', 'freq_rank', 'percentage', 'cum_percentage']
-    '''
-    p1 = r'\ufeff'
-    p2 = r'\n'
+    """
 
-    with open(file_name) as f:
-        num_feats = 3
+    with open(file_name, 'r', encoding='utf8') as f:
         keys = []
         data = []
 
-        lines = f.readlines()
-        for i, l in enumerate(lines):
-            lc = l
-            lc = re.sub(p1,'',lc)
-            lc = re.sub(p2,'',lc)
-            r = lc.split("\t")
+        for line in f.readlines():
+            row = line[:-1].split("\t")
 
-            try:
-                # don't include particles
-                if 'prt' in r[6]:
-                    continue
-                else:
-                    keys.append(r[1])
-                    data.append([r[0], r[3], r[4]])
-            except:
-                print("Error converting line {} with array: {} to float.".format(l, [r[0], r[3], r[4]]))
-    
-    npdata = np.array(data).astype(float)
-    df = pd.DataFrame(data=npdata, index=keys)
-    df.columns = ['occurances', 'freq_rank', 'percentage']
-
-    return df
-
-# old version
-# def LoadFreqList(file_name):
-#     freq_list = {}
-#     p1 = r'\ufeff'
-#     p2 = r'\n'
-#     with open(file_name) as f:
-#         for l in f.readlines():
-#             l = re.sub(p1,'',l)
-#             l = re.sub(p2,'',l)
-#             r = l.split("\t")
-#             if 'prt' in r[6]:
-#                 continue
-#             if r[1] not in freq_list.keys():
-#                 freq_list[r[1]] = r[2]
-#     return freq_list
-
-
-def AddJLPTtoFreqList(freq_list_df):
-    '''
-    Adds a JLPT column to the frequency list pandas dataframe
-    1-4 if has corresponding JLPT level
-    0 if it is not found
-    '''
-    num_rows = freq_list_df.shape[0]
-    jlpt = []
-
-    found = 0
-    not_found = 0
-
-    for index, row in freq_list_df.iterrows():
-        success = False
-        for k in ['1','2','3','4']:
-            try:
-                if vocab_bins[k][index]:
-                    success = True
-                    found += 1
-                    jlpt.append(k)
-                    break
-            except:
+            # not enough columns
+            if len(row) < 5:
                 continue
-  
-        if not success:
-            not_found += 1
-            jlpt.append('0')
 
-        success = False
+            # exclude particles
+            if 'prt' in row[6]:
+                continue
 
-    print("found {}, not_found {}, num_rows {}".format(found, not_found, num_rows))
-    assert (found + not_found) == num_rows, "found + not_found != num rows"
-    assert len(jlpt) == num_rows, "len(jlpt) != num_rows"
-    print("Assertions passed")
+            keys.append(row[1])
+            data.append([row[0], row[3], row[4]])
 
-    jlptdf = pd.DataFrame(data=np.array(jlpt).astype(int))
-    freq_list_df['jlpt'] = np.array(jlpt).astype(int)
-
-    return freq_list_df
+    return pd.DataFrame(data=np.array(data, dtype=float), index=keys,
+                        columns=['occurrences', 'freq_rank', 'percentage'])
 
 
-def SplitDFByJLPT(df):
+def add_jlpt_to_freq_list(freq_list, jlpt):
+    """
+    Adds a JLPT level column to the frequency list dataframe
+    1-4 if it has a corresponding JLPT level
+    0 if it does not
+    """
+
+    jlpt_level = [jlpt[word] if word in jlpt else 0 for word in freq_list.index.values]
+    freq_list['jlpt_level'] = np.array(jlpt_level).astype(int)
+
+    return freq_list
+
+
+def split_dataframe_by_jlpt(df):
     grouped = df.groupby(df.jlpt)
     df_0 = grouped.get_group(0)
-    df_jlpt = pd.concat( [ grouped.get_group(group) for group in grouped.groups if not group == 0 ])
+    df_jlpt = pd.concat([grouped.get_group(group) for group in grouped.groups if not group == 0])
 
     return df_0, df_jlpt
 
 
-def GetJLPTFreq(vocab_bins, freq_list):
+def get_jlpt_freq(vocab_bins, freq_list):
     jlpt_freq = {
         '4': [],
         '3': [],
@@ -183,6 +211,5 @@ def GetJLPTFreq(vocab_bins, freq_list):
             s = freq_list.get(vk)
             if s:
                 jlpt_freq[k].append(int(s))
-    
-    return jlpt_freq
 
+    return jlpt_freq
