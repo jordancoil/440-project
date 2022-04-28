@@ -30,8 +30,11 @@ FREQ_LISTS_FILENAMES = [FREQ_LISTS_DIRECTORY + freq_list_filename for freq_list_
                          'word_freq_report.txt']]
 
 
-# load JLPT vocab and sort into levels 1-4
 def load_jlpt_df():
+    """
+    Loads JLPT kanji and kana and sorts them into levels 1-4. Returns a dataframe. Loads it if already saved.
+    """
+
     if os.path.isfile(JLPT_DF_FILENAME):
         logging.info('Skipping load_jlpt_df(). File already exist: {}'.format(JLPT_DF_FILENAME))
         return pd.read_csv(JLPT_DF_FILENAME, encoding='utf8', keep_default_na=False)
@@ -140,6 +143,7 @@ def load_freq_list_df(file_name):
     col_names = ['occurrences', 'kanji', 'hiragana', 'kana', 'part_of_speech',
                  'anotherpos', 'freq_group', 'freq_rank', 'percentage', 'cum_percentage']
     """
+
     is_schema_one = None
     freq_list_dict = {'kanji': [], 'kana': [], 'percentage': []}
     with open(file_name, 'r', encoding='utf8') as f:
@@ -179,7 +183,8 @@ def add_jlpt_to_freq_list(jlpt, freq_list):
     """
 
     if os.path.isfile(FREQ_LISTS_DF_WITH_JLPT_FILENAME):
-        logging.info('Skipping add_jlpt_to_freq_list(). File already exist: {}'.format(FREQ_LISTS_DF_WITH_JLPT_FILENAME))
+        logging.info(
+            'Skipping add_jlpt_to_freq_list(). File already exist: {}'.format(FREQ_LISTS_DF_WITH_JLPT_FILENAME))
         return pd.read_csv(FREQ_LISTS_DF_WITH_JLPT_FILENAME, encoding='utf8', keep_default_na=False)
 
     # get the references to the numpy arrays
