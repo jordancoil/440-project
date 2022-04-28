@@ -1,18 +1,29 @@
+import logging
+import os
+
 import numpy as np
 import pandas as pd
 from word2vec.generate_vectors import get_word2vec_model
 
 
+TIDY_DATA_DIRECTORY = 'data/tidy/'
+JLPT_VOCAB_DF_FILENAME = TIDY_DATA_DIRECTORY + 'jlpt-vocab-df.data.csv'
+KANA_CHAR_COUNT_DF_FILENAME = TIDY_DATA_DIRECTORY + 'kana-char-count-df.data.csv'
+
+
 # load JLPT vocab and sort into levels 1-4
-def get_jlpt_vocab_matrix():
+def get_jlpt_vocab_df():
+    if os.path.isfile(JLPT_VOCAB_DF_FILENAME):
+        logging.info('Skipping get_jlpt_vocab_matrix(). File already exist: {}'.format(JLPT_VOCAB_DF_FILENAME))
+        return pd.read_csv(JLPT_VOCAB_DF_FILENAME, encoding='utf8', keep_default_na=False)
+
     file_names_and_bin_numbers = [
         ('data/jlpt/jlpt-voc-4-extra.utf', '4'),
         ('data/jlpt/jlpt-voc-3-extra.utf', '3'),
         ('data/jlpt/jlpt-voc-2-extra.utf', '2'),
         ('data/jlpt/jlpt-voc-1-extra.utf', '1')]
 
-    #               jlpt,   kanji,  kana
-    vocab_levels = [[], [], []]
+    jlpt_vocab_dict = {'jlpt': [], 'kanji': [], 'kana': []}
     kanji_list = set()
 
     for file_name, jlpt in file_names_and_bin_numbers:
@@ -29,49 +40,60 @@ def get_jlpt_vocab_matrix():
                     continue
 
                 # add JLPT difficulty
-                vocab_levels[0].append(int(jlpt))
+                jlpt_vocab_dict['jlpt'].append(int(jlpt))
 
                 # add both kanji and kana if it has it
                 if len(word_list) > 1 and word_list[1].startswith('[') and '（' not in word_list[1]:
-                    vocab_levels[1].append(word_list[0])
-                    vocab_levels[2].append(word_list[1][1:-1])
+                    jlpt_vocab_dict['kanji'].append(word_list[0])
+                    jlpt_vocab_dict['kana'].append(word_list[1][1:-1])
                     # add to list of used kanji
                     kanji_list.add(word_list[0])
                 # add just kana as it has no kanji
                 else:
-                    vocab_levels[1].append('')
-                    vocab_levels[2].append(word_list[0])
+                    jlpt_vocab_dict['kanji'].append('')
+                    jlpt_vocab_dict['kana'].append(word_list[0])
 
-    return vocab_levels
+    df = pd.DataFrame(jlpt_vocab_dict)
+    df.to_csv(JLPT_VOCAB_DF_FILENAME, index=False, encoding='utf8')
+    return df
 
 
-def generate_kana_char_count_matrix(kana):
-    kana_vectors = [kana]
-    char_to_column_index = dict()
+# generate the character count vectors for each kana
+def generate_kana_char_count_vectors(kana):
+    if os.path.isfile(KANA_CHAR_COUNT_DF_FILENAME):
+        logging.info('Skipping generate_kana_char_count_matrix(). File already exist: {}'.format(KANA_CHAR_COUNT_DF_FILENAME))
+        return pd.read_csv(KANA_CHAR_COUNT_DF_FILENAME, encoding='utf8', keep_default_na=False)
 
-    for word in kana:
+    kana_char_count_vectors = {'kana': kana}
+    char_columns = set()
+
+    for row, word in enumerate(kana):
         # set the count of each char to 0 for current word
-        for index in char_to_column_index.values():
-            kana_vectors[index].append(0)
+        for char in char_columns:
+            kana_char_count_vectors[char].append(0)
 
         for char in word:
             # char already has a column
-            if char in char_to_column_index.keys():
-                kana_vectors[char_to_column_index[char]][-1] += 1
+            if char in char_columns:
+                kana_char_count_vectors[char][-1] += 1
             # there is no char column, make one
             else:
-                char_to_column_index[char] = len(kana_vectors)
-                kana_vectors.append([0] * len(kana_vectors[0]))
-                kana_vectors[char_to_column_index[char]][-1] = 1
+                kana_char_count_vectors[char] = [0] * (row + 1)
+                kana_char_count_vectors[char][-1] = 1
+                char_columns.add(char)
 
-    return kana_vectors
+    df = pd.DataFrame(kana_char_count_vectors)
+    df.to_csv(KANA_CHAR_COUNT_DF_FILENAME, index=False, encoding='utf8')
+    return df
 
 
 if __name__ == "__main__":
-    vocab_matrix = get_jlpt_vocab_matrix()
-    kana_char_count_matrix = generate_kana_char_count_matrix(vocab_matrix[2])
+    vocab_matrix = get_jlpt_vocab_df()
+    print(vocab_matrix)
+    print(vocab_matrix['kana'].to_list())
+    kana_char_count_matrix = generate_kana_char_count_vectors(vocab_matrix['kana'].to_list())
     model = get_word2vec_model()
-    print(model.wv.most_similar(vocab_matrix[1][1]))
+    print(model.wv.most_similar(vocab_matrix['kana'][1]))
 
 
 # load JLPT vocab and sort into levels 1-4

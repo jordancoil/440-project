@@ -14,12 +14,16 @@ from gensim.models.word2vec import LineSentence
 logging.basicConfig(format='%(asctime)s : %(levelname)s : %(message)s', level=logging.INFO)
 
 DIRECTORY_PATH = 'word2vec/'
-WIKI_PATH = DIRECTORY_PATH + 'latest-pages-articles.xml.bz2'
-WIKI_TEXT_FILENAME = DIRECTORY_PATH + 'latest-text.txt'
-WIKI_TEXT_TOKENS_FILENAME = DIRECTORY_PATH + 'latest-text-tokens.txt'
-VECTORS_MODEL_FILENAME = DIRECTORY_PATH + 'gensim.{}d.data.model'.format(50)
-VECTORS_TEXT_FILENAME = DIRECTORY_PATH + 'gensim.{}d.data.txt'.format(50)
+
+WIKI_DIRECTORY_PATH = 'data/wiki/'
+WIKI_PATH = DIRECTORY_PATH + WIKI_DIRECTORY_PATH + 'latest-pages-articles.xml.bz2'
+WIKI_TEXT_FILENAME = DIRECTORY_PATH + WIKI_DIRECTORY_PATH + 'latest-text.txt'
+WIKI_TEXT_TOKENS_FILENAME = DIRECTORY_PATH + WIKI_DIRECTORY_PATH + 'latest-text-tokens.txt'
 WIKI_LATEST_URL = 'https://dumps.wikimedia.org/jawiki/latest/jawiki-latest-pages-articles.xml.bz2'
+
+MODEL_DIRECTORY_PATH = 'model/'
+VECTORS_MODEL_FILENAME = DIRECTORY_PATH + MODEL_DIRECTORY_PATH + 'gensim.{}d.data.model'.format(50)
+VECTORS_TEXT_FILENAME = DIRECTORY_PATH + MODEL_DIRECTORY_PATH + 'gensim.{}d.data.txt'.format(50)
 
 
 def process_wiki_to_text(input_filename, output_text_filename):
@@ -27,7 +31,7 @@ def process_wiki_to_text(input_filename, output_text_filename):
         logging.info('Skipping process_wiki_to_text(). File already exist: {}'.format(output_text_filename))
         return
 
-    with open(output_text_filename, 'w', encoding="UTF-8") as out:
+    with open(output_text_filename, 'w', encoding="utf8") as out:
         # Open the Wiki Dump with gensim
         wiki = WikiCorpus(input_filename, dictionary={}, processes=cpu_count())
         wiki.metadata = True
@@ -48,8 +52,8 @@ def tokenize_text(input_filename, output_filename):
         logging.info('Skipping tokenize_text(). File already exists: {}'.format(output_filename))
         return
 
-    with open(output_filename, 'w', encoding="UTF-8") as out:
-        with open(input_filename, 'r', encoding="UTF-8") as inp:
+    with open(output_filename, 'w', encoding="utf8") as out:
+        with open(input_filename, 'r', encoding="utf8") as inp:
             for i, text in enumerate(inp.readlines()):
                 tokenized_text = ' '.join(get_words(text))
 
