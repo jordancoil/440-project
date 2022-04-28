@@ -4,7 +4,7 @@ from word2vec.generate_vectors import get_word2vec_model
 
 
 # load JLPT vocab and sort into levels 1-4
-def load_vocab_levels():
+def get_jlpt_vocab_matrix():
     file_names_and_bin_numbers = [
         ('data/jlpt/jlpt-voc-4-extra.utf', '4'),
         ('data/jlpt/jlpt-voc-3-extra.utf', '3'),
@@ -44,69 +44,34 @@ def load_vocab_levels():
 
     return vocab_levels
 
-'''
-    for file_name, bin_number in file_names_and_bin_numbers:
-        with open(file_name, 'r', encoding='utf8') as f:
-            char_to_column_index = dict()
 
-            for line in f.readlines():
-                # skip if line is a comment or empty
-                if line.startswith("#") or line.startswith("\n"):
-                    continue
-
-                word_list = line[:-1].split(" ")
-
-                # skip words that have tilde or appear in lower difficulty bins
-                if '~' in word_list[0] or any(
-                        [word_list[0] in vocab_bins[str(k)][0] for k in range(int(bin_number) + 1, 5)]):
-                    continue
-
-                # add both kanji and kana if it has it
-                if len(word_list) > 1 and word_list[1].startswith('[') and '（' not in word_list[1]:
-                    vocab_bins[bin_number][0].append(word_list[0])
-                    vocab_bins[bin_number][1].append(word_list[1][1:-1])
-                # has no kanji
-                else:
-                    vocab_bins[bin_number][0].append('')
-                    vocab_bins[bin_number][1].append(word_list[0])
-
-                # set the count of each char to 0
-                for char in char_to_column_index.keys():
-                    vocab_bins[bin_number][char_to_column_index[char]].append(0)
-
-                # for each char in the kana, increase count by 1
-                for char in vocab_bins[bin_number][1][-1]:
-                    # char is already has a column
-                    if char in char_to_column_index:
-                        vocab_bins[bin_number][char_to_column_index[char]][-1] += 1
-                    # there is no char column, make one
-                    else:
-                        char_to_column_index[char] = len(vocab_bins[bin_number])
-                        vocab_bins[bin_number].append([0] * len(vocab_bins[bin_number][0]))
-                        vocab_bins[bin_number][char_to_column_index[char]][-1] = 1
-
-    return vocab_bins
-'''
-
-
-# todo
-def generate_word_similarity_model(kana):
-    char_to_column_index = dict()
+def generate_kana_char_count_matrix(kana):
     kana_vectors = [kana]
+    char_to_column_index = dict()
+
     for word in kana:
+        # set the count of each char to 0 for current word
         for index in char_to_column_index.values():
             kana_vectors[index].append(0)
 
         for char in word:
+            # char already has a column
             if char in char_to_column_index.keys():
                 kana_vectors[char_to_column_index[char]][-1] += 1
+            # there is no char column, make one
             else:
-                1+1
+                char_to_column_index[char] = len(kana_vectors)
+                kana_vectors.append([0] * len(kana_vectors[0]))
+                kana_vectors[char_to_column_index[char]][-1] = 1
+
+    return kana_vectors
+
 
 if __name__ == "__main__":
-    levels = load_vocab_levels()
-    print(levels)
+    vocab_matrix = get_jlpt_vocab_matrix()
+    kana_char_count_matrix = generate_kana_char_count_matrix(vocab_matrix[2])
     model = get_word2vec_model()
+    print(model.wv.most_similar(vocab_matrix[1][1]))
 
 
 # load JLPT vocab and sort into levels 1-4
