@@ -7,13 +7,15 @@ import pandas as pd
 
 from word2vec.generate_vectors import get_word2vec_model
 
+# Tidy data
 TIDY_DATA_DIRECTORY = 'data/tidy/'
 JLPT_DF_FILENAME = TIDY_DATA_DIRECTORY + 'jlpt-df.csv'
 KANJI_LEVELS_DF_FILENAME = TIDY_DATA_DIRECTORY + 'kanji-levels-df.csv'
 KANA_CHAR_COUNT_DF_FILENAME = TIDY_DATA_DIRECTORY + 'kana-char-count-df.csv'
 FREQ_LISTS_DF_FILENAME = TIDY_DATA_DIRECTORY + 'freq-list-df.csv'
-FREQ_LISTS_DF_WITH_JLPT_FILENAME = TIDY_DATA_DIRECTORY + 'freq-list-with-jlpt-df.csv'
+JLPT_WITH_FREQ_DF_FILENAME = TIDY_DATA_DIRECTORY + 'jlpt-with-freq-df.csv'
 
+# JLPT data
 JLPT_DIRECTORY = 'data/jlpt/'
 JLPT_FILENAMES_AND_BIN_NUMBERS = [(JLPT_DIRECTORY + jlpt_file_name, bin_number)
                                   for jlpt_file_name, bin_number in
@@ -22,8 +24,10 @@ JLPT_FILENAMES_AND_BIN_NUMBERS = [(JLPT_DIRECTORY + jlpt_file_name, bin_number)
                                    ('jlpt-voc-2-extra.utf', '2'),
                                    ('jlpt-voc-1-extra.utf', '1')]]
 
+# Kanji levels data
 KANJI_LEVELS_FILENAME = 'data/levels/' + 'kanji-levels.json'
 
+# Frequency list data
 FREQ_LISTS_DIRECTORY = 'data/freq_lists/'
 FREQ_LISTS_FILENAMES = [FREQ_LISTS_DIRECTORY + freq_list_filename for freq_list_filename in
                         ['netflix_unidic_3011_no_names_word_freq_report.txt',
@@ -167,12 +171,35 @@ def load_freq_list_df(file_name):
                 freq_list_dict['kana'].append('')
                 freq_list_dict['percentage'].append(float(row[4]))
             else:
+                # skip if latin characters are present
+                if row[1].upper().isupper():
+                    continue
                 # only add kanji if it's not the same as kana
                 freq_list_dict['kanji'].append('' if row[1] == row[2] else row[1])
                 freq_list_dict['kana'].append(row[2])
                 freq_list_dict['percentage'].append(float(row[8]))
 
     return pd.DataFrame(data=freq_list_dict)
+
+
+def load_merged_freq_list():
+    """
+    Load frequency lists into one dataframe
+    """
+
+    if os.path.isfile(FREQ_LISTS_DF_FILENAME):
+        return pd.read_csv(FREQ_LISTS_DF_FILENAME, encoding='utf8', keep_default_na=False)
+
+    # load and merge frequency lists
+    freq_list_df = pd.concat([load_freq_list_df(file_name) for file_name in FREQ_LISTS_FILENAMES])
+    # merge the same kanji, kana into one row
+    freq_list_df.groupby(['kanji', 'kana'])['percentage'].transform('sum')
+    # normalize percentage
+    total_freq = freq_list_df['percentage'].sum()
+    freq_list_df['percentage'].transform(lambda x: x / total_freq)
+
+    freq_list_df.to_csv(FREQ_LISTS_DF_FILENAME, index=False, encoding='utf8')
+    return freq_list_df
 
 
 def add_jlpt_to_freq_list(jlpt, freq_list):
@@ -182,54 +209,73 @@ def add_jlpt_to_freq_list(jlpt, freq_list):
     0 if it does not
     """
 
-    if os.path.isfile(FREQ_LISTS_DF_WITH_JLPT_FILENAME):
+    if os.path.isfile(JLPT_WITH_FREQ_DF_FILENAME):
         logging.info(
-            'Skipping add_jlpt_to_freq_list(). File already exist: {}'.format(FREQ_LISTS_DF_WITH_JLPT_FILENAME))
-        return pd.read_csv(FREQ_LISTS_DF_WITH_JLPT_FILENAME, encoding='utf8', keep_default_na=False)
+            'Skipping add_jlpt_to_freq_list(). File already exist: {}'.format(JLPT_WITH_FREQ_DF_FILENAME))
+        return pd.read_csv(JLPT_WITH_FREQ_DF_FILENAME, encoding='utf8', keep_default_na=False)
 
     # get the references to the numpy arrays
     kanji_list = jlpt['kanji'].values
     kana_list = jlpt['kana'].values
     level_list = jlpt['jlpt'].values
 
-    # find jlpt levels for the kanji and/or kana
+    # find JLPT levels for the kanji and/or kana
     jlpt_level = [level_list[np.where(kanji_list == kanji)][0] if kanji in kanji_list else
                   level_list[np.where(kana_list == kana)][0] if kana in kana_list else 0
                   for kanji, kana in zip(freq_list['kanji'], freq_list['kana'])]
     # add levels to frequency list dataframe
     freq_list['jlpt_level'] = np.array(jlpt_level).astype(int)
 
-    freq_list.to_csv(FREQ_LISTS_DF_WITH_JLPT_FILENAME, index=False, encoding='utf8')
+    freq_list.to_csv(JLPT_WITH_FREQ_DF_FILENAME, index=False, encoding='utf8')
     return freq_list
 
 
+def add_freq_to_jlpt(freq_list, jlpt):
+    """
+    Adds frequency percentage to JLPT dataframe
+    """
+
+    if os.path.isfile(JLPT_WITH_FREQ_DF_FILENAME):
+        logging.info(
+            'Skipping add_freq_to_jlpt(). File already exist: {}'.format(JLPT_WITH_FREQ_DF_FILENAME))
+        return pd.read_csv(JLPT_WITH_FREQ_DF_FILENAME, encoding='utf8', keep_default_na=False)
+
+    # get the references to the numpy arrays
+    kanji_list = freq_list['kanji'].values
+    kana_list = freq_list['kana'].values
+    percentage_list = freq_list['percentage'].values
+
+    # find percentage for the kanji and/or kana
+    percentage = [percentage_list[np.where(kanji_list == kanji)][0] if kanji in kanji_list else
+                  percentage_list[np.where(kana_list == kana)][0] if kana in kana_list else 0
+                  for kanji, kana in zip(jlpt['kanji'], jlpt['kana'])]
+    # add percentage to JLPT dataframe
+    jlpt['percentage'] = np.array(percentage).astype(float)
+
+    jlpt.to_csv(JLPT_WITH_FREQ_DF_FILENAME, index=False, encoding='utf8')
+    return jlpt
+
+
 if __name__ == "__main__":
-    # load jlpt dataframe
-    jlpt_kanji_kana_df = load_jlpt_df()
+    # load JLPT dataframe
+    jlpt_df = load_jlpt_df()
 
     # load kanji levels dataframe
     kanji_levels_df = load_kanji_levels_df()
+    # merge kanji levels dataframe
+    jlpt_kanji_df = pd.merge(jlpt_df, kanji_levels_df, on='kanji', how='left').fillna(-1)
 
     # generate the kana character count vectors
-    kana_char_count_vectors = generate_kana_char_count_vectors(jlpt_kanji_kana_df['kana'].to_list())
+    kana_char_count_vectors = generate_kana_char_count_vectors(jlpt_df['kana'].to_list())
+    # merge JLPT and kana vectors
+    jlpt_kanji_kana_df = pd.merge(jlpt_kanji_df, kana_char_count_vectors,
+                                  left_index=True, right_index=True, suffixes=('', '_drop')).drop('kana_drop', axis=1)
 
     # load frequency lists into one dataframe
-    if os.path.isfile(FREQ_LISTS_DF_FILENAME):
-        freq_list_df = pd.read_csv(FREQ_LISTS_DF_FILENAME, encoding='utf8', keep_default_na=False)
-    else:
-        # load and merge frequency lists
-        freq_list_df = pd.concat([load_freq_list_df(file_name) for file_name in FREQ_LISTS_FILENAMES])
-        # merge the same kanji, kana into one row
-        freq_list_df.groupby(['kanji', 'kana'])['percentage'].transform('sum')
-        # normalize percentage
-        total_freq = freq_list_df['percentage'].sum()
-        freq_list_df['percentage'].transform(lambda x: x / total_freq)
+    freq_list_df = load_merged_freq_list()
 
-        freq_list_df.to_csv(FREQ_LISTS_DF_FILENAME, index=False, encoding='utf8')
-
-    # add jlpt levels to frequency list dataframe
-    jlpt_freq_df = add_jlpt_to_freq_list(jlpt_kanji_kana_df, freq_list_df)
-    print(jlpt_freq_df)
+    # add JLPT levels to frequency list dataframe
+    jlpt_freq_df = add_freq_to_jlpt(freq_list_df, jlpt_kanji_kana_df)
 
     # get the word2vec model
     model = get_word2vec_model()
