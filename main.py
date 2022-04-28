@@ -7,8 +7,8 @@ from word2vec.generate_vectors import get_word2vec_model
 
 
 TIDY_DATA_DIRECTORY = 'data/tidy/'
-JLPT_VOCAB_DF_FILENAME = TIDY_DATA_DIRECTORY + 'jlpt-vocab-df.data.csv'
-KANA_CHAR_COUNT_DF_FILENAME = TIDY_DATA_DIRECTORY + 'kana-char-count-df.data.csv'
+JLPT_VOCAB_DF_FILENAME = TIDY_DATA_DIRECTORY + 'jlpt-vocab-df.csv'
+KANA_CHAR_COUNT_DF_FILENAME = TIDY_DATA_DIRECTORY + 'kana-char-count-df.csv'
 
 
 # load JLPT vocab and sort into levels 1-4
